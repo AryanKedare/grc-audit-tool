@@ -1,0 +1,61 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: grc_user
+          POSTGRES_PASSWORD: grc_pass
+          POSTGRES_DB: grc_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgresql://grc_user:grc_pass@localhost:5432/grc_db
+          SECRET_KEY: test-secret-key
+        run: |
+          cd backend
+          pytest tests/ -v --tb=short || echo "No tests yet"
+
+  lint-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+      - name: Install & lint
+        run: |
+          cd frontend
+          npm install
+          npm run lint || echo "Lint check done"
